@@ -28,6 +28,6 @@ typedef struct cpu {
 } CPU;
 
 void cpu_initialize(CPU* cpu);
-void cpu_cycle(CPU* cpu, MMU* mmu, PPU* ppu);
+int cpu_cycle(CPU* cpu, MMU* mmu, PPU* ppu);
 
 #endif

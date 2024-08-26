@@ -131,7 +131,7 @@ void set_c(CPU* cpu, bool value) {
     }
 }
 
-void cpu_cycle(CPU* cpu, MMU* mmu, PPU* ppu) {
+int cpu_cycle(CPU* cpu, MMU* mmu, PPU* ppu) {
     cpu_debug(cpu);
 
     uint8_t opcode = mmu->data[cpu->pc];
@@ -592,7 +592,5 @@ void cpu_cycle(CPU* cpu, MMU* mmu, PPU* ppu) {
 
     cpu->cycles += cycles;
 
-    for (int i = 0; i < cycles; i++) {
-        ppu_cycle(ppu, mmu);
-    }
+    return cycles;
 }

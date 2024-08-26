@@ -47,7 +47,11 @@ int main(int argc, char* argv[]) {
         }
 
         // CPU cycle
-        cpu_cycle(&cpu, &mmu, &ppu);
+        int cycles = cpu_cycle(&cpu, &mmu, &ppu);
+
+        for (int i = 0; i < cycles; i++) {
+            ppu_cycle(&ppu, &mmu);
+        }
         // printf("PC: %04X, SP: %04X, A: %02X, B: %02X, C: %02X, D: %02X, E: %02X, H: %02X, L: %02X, F: %02X\n", cpu.pc, cpu.sp, cpu.a, cpu.b, cpu.c, cpu.d, cpu.e, cpu.h, cpu.l, cpu.f);
 
         // PPU signal
