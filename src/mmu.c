@@ -11,6 +11,12 @@ void mmu_write(MMU* mmu, uint16_t address, uint8_t value) {
     if (address < 0x8000) {
         return; // ROM
     }
+
+    if (address >= 0xFF10 && address <= 0xFF26) {
+        // audio debug
+        // printf("Writing 0x%02X to sound register 0x%04X\n", value, address);
+    }
+
     mmu->data[address] = value;
 }
 
