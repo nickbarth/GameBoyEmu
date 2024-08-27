@@ -2,7 +2,6 @@
 #define APU_H
 
 #include <stdint.h>
-#include <SDL.h>
 #include "mmu.h"
 
 typedef struct {
