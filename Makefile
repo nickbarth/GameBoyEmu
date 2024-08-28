@@ -1,6 +1,6 @@
 CC = gcc
-CFLAGS = -Wall `sdl2-config --cflags` 
-LDFLAGS = `sdl2-config --libs`
+CFLAGS = -Wall -I/usr/local/include/raylib
+LDFLAGS = -L/usr/local/lib -lraylib
 SRCS = $(wildcard src/*.c)
 OBJS = $(SRCS:.c=.o)
 TARGET = gameboy

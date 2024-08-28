@@ -1,4 +1,4 @@
-#include <SDL.h>
+#include "raylib.h"
 #include <stdio.h>
 #include <stdbool.h>
 #include "cart.h"
@@ -8,6 +8,8 @@
 #include "apu.h"
 
 #define SCALE_FACTOR 3
+#define GB_CPU_FREQ 4194304  // Game Boy CPU frequency in Hz
+#define FRAME_CYCLES (GB_CPU_FREQ / 60)  // Cycles per frame at 60 FPS
 
 int main(int argc, char* argv[]) {
     if (argc != 2) {
@@ -34,53 +36,41 @@ int main(int argc, char* argv[]) {
     APU apu;
     apu_initialize(&apu);
 
-    // Initialize SDL
-    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) < 0) {
-        printf("SDL could not initialize! SDL_Error: %s\n", SDL_GetError());
-        return 1;
-    }
-
-    // SDL Audio
-    SDL_AudioSpec desiredSpec;
-    SDL_AudioSpec obtainedSpec;
-    desiredSpec.freq = 44100;
-    desiredSpec.format = AUDIO_U16SYS;
-    desiredSpec.channels = 1;
-    desiredSpec.samples = 2048;
-    desiredSpec.callback = audio_callback;
-    desiredSpec.userdata = &apu;
-
-    if (SDL_OpenAudio(&desiredSpec, &obtainedSpec) < 0) {
-        printf("SDL could not open audio! SDL_Error: %s\n", SDL_GetError());
-        SDL_Quit();
-        return 1;
-    }
-
-    SDL_PauseAudio(0);
-
-    // SDL Video
-    SDL_Window* window = SDL_CreateWindow("Game Boy Emulator", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, PPU_DISPLAY_WIDTH * SCALE_FACTOR, PPU_DISPLAY_HEIGHT * SCALE_FACTOR, SDL_WINDOW_SHOWN);
-    SDL_Renderer* renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
-    SDL_Texture* texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STREAMING, PPU_DISPLAY_WIDTH, PPU_DISPLAY_HEIGHT);
+    // Initialize Raylib
+    InitWindow(PPU_DISPLAY_WIDTH * SCALE_FACTOR, PPU_DISPLAY_HEIGHT * SCALE_FACTOR, "Game Boy Emulator");
+    InitAudioDevice();
+    AudioStream audioStream = LoadAudioStream(44100, 16, 1);
+    PlayAudioStream(audioStream);
 
     uint32_t pixels[PPU_DISPLAY_WIDTH * PPU_DISPLAY_HEIGHT];
+    Image screenImage = {
+        .data = pixels,
+        .width = PPU_DISPLAY_WIDTH,
+        .height = PPU_DISPLAY_HEIGHT,
+        .mipmaps = 1,
+        .format = PIXELFORMAT_UNCOMPRESSED_R8G8B8A8
+    };
+    Texture2D texture = LoadTextureFromImage(screenImage);
 
-    bool quit = false;
-    SDL_Event e;
+    SetTargetFPS(60);
+    while (!WindowShouldClose()) {
+        int cycles_executed = 0;
 
-    while (!quit) {
-        while (SDL_PollEvent(&e) != 0) {
-            if (e.type == SDL_QUIT || (e.type == SDL_KEYDOWN && e.key.keysym.sym == SDLK_ESCAPE)) {
-                quit = true;
+        while (cycles_executed < FRAME_CYCLES) {
+            // CPU cycle
+            int cycles = cpu_cycle(&cpu, &mmu, &ppu);
+            cycles_executed += cycles;
+
+            for (int i = 0; i < cycles; i++) {
+                ppu_cycle(&ppu, &mmu);
+                apu_cycle(&apu, &mmu);
             }
-        }
 
-        // CPU cycle
-        int cycles = cpu_cycle(&cpu, &mmu, &ppu);
-
-        for (int i = 0; i < cycles; i++) {
-            ppu_cycle(&ppu, &mmu);
-            apu_cycle(&apu, &mmu);
+            // Audio processing
+            if (apu.buffer_position > 0 && IsAudioStreamProcessed(audioStream)) {
+                UpdateAudioStream(audioStream, apu.buffer, apu.buffer_position);
+                apu.buffer_position = 0;
+            }
         }
 
         // PPU signal
@@ -88,19 +78,20 @@ int main(int argc, char* argv[]) {
             for (int i = 0; i < PPU_DISPLAY_WIDTH * PPU_DISPLAY_HEIGHT; ++i) {
                 pixels[i] = ppu.display[i];
             }
-            SDL_UpdateTexture(texture, NULL, pixels, PPU_DISPLAY_WIDTH * sizeof(uint32_t));
-            SDL_RenderClear(renderer);
-            SDL_RenderCopy(renderer, texture, NULL, NULL);
-            SDL_RenderPresent(renderer);
+            UpdateTexture(texture, pixels);
             ppu.drawFlag = false;
         }
+
+        BeginDrawing();
+        ClearBackground(RAYWHITE);
+        DrawTextureEx(texture, (Vector2){0, 0}, 0.0f, SCALE_FACTOR, WHITE);
+        EndDrawing();
     }
 
-    SDL_CloseAudio();
-    SDL_DestroyTexture(texture);
-    SDL_DestroyRenderer(renderer);
-    SDL_DestroyWindow(window);
-    SDL_Quit();
+    UnloadTexture(texture);
+    UnloadAudioStream(audioStream);
+    CloseAudioDevice();
+    CloseWindow();
 
     return 0;
 }
